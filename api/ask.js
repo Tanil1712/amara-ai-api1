@@ -6,6 +6,7 @@ apiKey: process.env.OPENAI_API_KEY,
 });
 
 export default async function handler(req, res) {
+// ✅ CORS (important for mobile + browser testing)
 res.setHeader("Access-Control-Allow-Origin", "*");
 res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
 res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -19,27 +20,54 @@ return res.status(405).json({ error: "Method not allowed" });
 }
 
 try {
-const { question } = req.body;
+const { message, context, mode } = req.body;
 
-if (!question) {
-return res.status(400).json({ error: "Question is required" });
+if (!message) {
+return res.status(400).json({ error: "Message is required" });
+}
+
+// 🎓 System behavior control
+let systemPrompt = "You are Amara, a helpful academic AI assistant.";
+
+if (mode === "step_by_step") {
+systemPrompt = `
+You are Amara, a patient and intelligent secondary school teacher.
+
+Rules:
+- Teach step by step.
+- Show formulas clearly.
+- Explain reasoning clearly.
+- Keep explanations simple and structured.
+- Make it easy for students.
+`;
 }
 
 const completion = await openai.chat.completions.create({
 model: "gpt-4o-mini",
 messages: [
-{ role: "system", content: "You are a helpful AI tutor." },
-{ role: "user", content: question },
+{ role: "system", content: systemPrompt },
+{
+role: "user",
+content: `
+Context:
+${context || "None"}
+
+Student Question:
+${message}
+`,
+},
 ],
 });
 
 return res.status(200).json({
-answer: completion.choices[0].message.content,
+reply: completion.choices[0].message.content,
 });
+
 } catch (error) {
+console.error("AI ERROR:", error);
+
 return res.status(500).json({
-error: "Something went wrong",
+error: "AI error",
 details: error.message,
 });
-}
 }
